@@ -1,39 +1,272 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arriba el Toluca</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memorama con Puntos</title>
 
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: black;
-        }
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, sans-serif;
+}
 
-        .texto {
-            color: red;
-            font-size: 60px;
-            font-weight: bold;
-            font-family: Arial, sans-serif;
-            animation: parpadear 1s infinite;
-        }
+body{
+    background:#1e293b;
+    color:white;
+    text-align:center;
+    padding:20px;
+}
 
-        @keyframes parpadear {
-            0%, 50% {
-                opacity: 1;
-            }
-            51%, 100% {
-                opacity: 0;
-            }
-        }
-    </style>
+h1{
+    margin-bottom:15px;
+}
+
+.controls{
+    margin-bottom:20px;
+}
+
+select, button{
+    padding:10px;
+    font-size:16px;
+    border:none;
+    border-radius:8px;
+    margin:5px;
+}
+
+button{
+    background:#22c55e;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#16a34a;
+}
+
+.stats{
+    display:flex;
+    justify-content:center;
+    gap:25px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+    font-size:18px;
+}
+
+#gameBoard{
+    display:grid;
+    gap:10px;
+    justify-content:center;
+    margin:auto;
+}
+
+.card{
+    width:70px;
+    height:70px;
+    background:#334155;
+    border-radius:10px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:32px;
+    cursor:pointer;
+    user-select:none;
+    transition:.3s;
+}
+
+.card.flipped{
+    background:#0ea5e9;
+}
+
+.card.matched{
+    background:#22c55e;
+    cursor:default;
+}
+</style>
 </head>
 <body>
-    <div class="texto">ARRIBA EL TOLUCA</div>
+
+<h1>🎴 Memorama</h1>
+
+<div class="controls">
+    <label>Pares:</label>
+    <select id="pairCount">
+        <option value="8">8 pares</option>
+        <option value="12">12 pares</option>
+        <option value="16">16 pares</option>
+        <option value="20">20 pares</option>
+        <option value="24">24 pares</option>
+        <option value="28">28 pares</option>
+        <option value="32">32 pares</option>
+    </select>
+
+    <button onclick="startGame()">Nuevo Juego</button>
+</div>
+
+<div class="stats">
+    <div>🏆 Puntos: <span id="score">0</span></div>
+    <div>🎯 Pares: <span id="pairsFound">0</span></div>
+    <div>🔄 Movimientos: <span id="moves">0</span></div>
+</div>
+
+<div id="gameBoard"></div>
+
+<script>
+const emojis = [
+"🍎","🍌","🍇","🍉","🍓","🍒","🥝","🍍",
+"🥥","🍑","🥭","🍋","🍊","🍐","🍈","🥕",
+"🌽","🍄","🌶️","🥔","🍔","🍕","🌭","🍟",
+"🥨","🧀","🍩","🍪","🎂","🍰","🧁","🍫"
+];
+
+let firstCard = null;
+let secondCard = null;
+let lockBoard = false;
+
+let score = 0;
+let moves = 0;
+let pairsFound = 0;
+let totalPairs = 8;
+
+function shuffle(array){
+    for(let i=array.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [array[i],array[j]]=[array[j],array[i]];
+    }
+    return array;
+}
+
+function startGame(){
+
+    totalPairs = Number(document.getElementById("pairCount").value);
+
+    score = 0;
+    moves = 0;
+    pairsFound = 0;
+
+    updateStats();
+
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
+
+    const board = document.getElementById("gameBoard");
+
+    let cols = Math.ceil(Math.sqrt(totalPairs * 2));
+    board.style.gridTemplateColumns = `repeat(${cols}, 70px)`;
+
+    const selected = emojis.slice(0,totalPairs);
+    const cards = shuffle([...selected,...selected]);
+
+    board.innerHTML = "";
+
+    cards.forEach(symbol=>{
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        card.dataset.symbol = symbol;
+        card.dataset.revealed = "false";
+
+        card.textContent = "❓";
+
+        card.addEventListener("click",flipCard);
+
+        board.appendChild(card);
+    });
+}
+
+function flipCard(){
+
+    if(lockBoard) return;
+
+    if(this.dataset.revealed === "true") return;
+
+    this.textContent = this.dataset.symbol;
+    this.classList.add("flipped");
+    this.dataset.revealed = "true";
+
+    if(!firstCard){
+        firstCard = this;
+        return;
+    }
+
+    secondCard = this;
+    moves++;
+    updateStats();
+
+    checkMatch();
+}
+
+function checkMatch(){
+
+    if(firstCard.dataset.symbol === secondCard.dataset.symbol){
+
+        firstCard.classList.add("matched");
+        secondCard.classList.add("matched");
+
+        pairsFound++;
+
+        let bonus = Math.max(5, 20 - Math.floor(moves/5));
+        score += 10 + bonus;
+
+        updateStats();
+
+        resetTurn();
+
+        if(pairsFound === totalPairs){
+
+            score += 100;
+
+            setTimeout(()=>{
+                alert(
+                    `🎉 ¡Ganaste!\n\n` +
+                    `Puntos: ${score}\n` +
+                    `Movimientos: ${moves}`
+                );
+            },300);
+        }
+
+    }else{
+
+        lockBoard = true;
+
+        score = Math.max(0, score - 2);
+        updateStats();
+
+        setTimeout(()=>{
+
+            firstCard.textContent = "❓";
+            secondCard.textContent = "❓";
+
+            firstCard.classList.remove("flipped");
+            secondCard.classList.remove("flipped");
+
+            firstCard.dataset.revealed = "false";
+            secondCard.dataset.revealed = "false";
+
+            resetTurn();
+
+        },900);
+    }
+}
+
+function resetTurn(){
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
+}
+
+function updateStats(){
+    document.getElementById("score").textContent = score;
+    document.getElementById("moves").textContent = moves;
+    document.getElementById("pairsFound").textContent = pairsFound;
+}
+
+startGame();
+</script>
+
 </body>
 </html>
